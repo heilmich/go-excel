@@ -6,11 +6,9 @@ use Chelbit\Exceltools\Cli\CliExporter;
 use Chelbit\Exceltools\Data\Schema;
 use Chelbit\Exceltools\Http\HttpClient;
 use Chelbit\Exceltools\Enums\Mode;
+use Generator;
+use RuntimeException;
 
-/**
- * Единая точка входа для импорта/экспорта.
- * В зависимости от настроек модуля (service|cli) вызывает нужные реализации.
- */
 final class Client
 {
     private HttpClient|CliClient|null $importer = null;
@@ -26,7 +24,9 @@ final class Client
 
         if ($this->mode === Mode::CLI) {
             $cliPath = Config::getCliPath();
-            $this->importer = new CliClient($cliPath, Config::getCliTimeout());
+            // The timeout value was lost in previous refactoring, let's add it back.
+            $timeout = Config::getCliTimeout() ?: 60;
+            $this->importer = new CliClient($cliPath, $timeout);
             $this->exporter = new CliExporter($cliPath);
         } else {
             $httpClient = new HttpClient(Config::getServiceUrl(), Config::getAuthToken());
@@ -35,67 +35,58 @@ final class Client
         }
     }
 
-    /** Импорт: генератор NDJSON. @param Schema|array|string $schema */
-    public function parse(string $filePath, $schema): \Generator
+    /**
+     * Imports an Excel file and yields rows as associative arrays.
+     * The schema should be configured for import using `forImport()`.
+     */
+    public function import(string $filePath, Schema $schema): Generator
     {
         if (!$this->importer) {
-            throw new \RuntimeException('Importer is not configured');
+            throw new RuntimeException('Importer is not configured');
         }
-        return $this->importer->parse($filePath, Schema::fromMixed($schema));
+        return $this->importer->parse($filePath, $schema);
     }
 
-    /** Импорт: стримовый коллбек. Только для HTTP (CLI вариант уже потоковый через stdout). */
-    public function parseStream(string $filePath, $schema, callable $onRow): void
-    {
-        if ($this->importer instanceof HttpClient) {
-            $this->importer->parseStream($filePath, Schema::fromMixed($schema), $onRow);
-            return;
-        }
-
-        // Для CLI используйте parse() и читайте генератор
-        foreach ($this->parse($filePath, $schema) as $row) {
-            $onRow($row);
-        }
-    }
-
-    /** Экспорт в файл. @param Schema|array|string $schema */
-    public function exportToFile(string $destPath, array $rows, $schema, array $formulas = [], array $options = [], ?string $templatePath = null): void
+    /**
+     * Exports data to an Excel file and saves it to the specified path.
+     * The schema should be configured with export data using methods like `withRows()`, `addBlock()`, etc.
+     */
+    public function exportToFile(string $outputPath, Schema $schema, ?string $templatePath = null): void
     {
         if (!$this->exporter) {
-            throw new \RuntimeException('Exporter is not configured');
+            throw new RuntimeException('Exporter is not configured');
         }
 
         if ($this->exporter instanceof HttpClient) {
-            $bytes = $this->exporter->export($rows, Schema::fromMixed($schema), $formulas, $options, $templatePath);
-            $dir = dirname($destPath); if (!is_dir($dir)) { @mkdir($dir, 0775, true); }
-            file_put_contents($destPath, $bytes);
+            $bytes = $this->exporter->export($schema, $templatePath);
+            $dir = dirname($outputPath); if (!is_dir($dir)) { @mkdir($dir, 0775, true); }
+            if (file_put_contents($outputPath, $bytes) === false) {
+                throw new RuntimeException("Failed to write exported file to {$outputPath}");
+            }
         } else { // Must be CliExporter
-            $this->exporter->exportToFile($destPath, $rows, Schema::fromMixed($schema), $formulas, $options, $templatePath);
+            $this->exporter->exportToFile($outputPath, $schema, $templatePath);
         }
     }
 
-    /** Экспорт в память (байты XLSX). */
-    public function exportToBytes(array $rows, $schema, array $formulas = [], array $options = [], ?string $templatePath = null): string
+    /**
+     * Exports data to an Excel file and returns its content as a byte string.
+     */
+    public function exportToBytes(Schema $schema, ?string $templatePath = null): string
     {
         if (!$this->exporter) {
-            throw new \RuntimeException('Exporter is not configured');
+            throw new RuntimeException('Exporter is not configured');
         }
 
         if ($this->exporter instanceof HttpClient) {
-            return $this->exporter->export($rows, Schema::fromMixed($schema), $formulas, $options, $templatePath);
+            return $this->exporter->export($schema, $templatePath);
         }
 
         // For CLI, we must write to a temp file and read it back
-        $tmpFile = tempnam(sys_get_temp_dir(), 'exp_') . '.xlsx';
-        $this->exporter->exportToFile($tmpFile, $rows, Schema::fromMixed($schema), $formulas, $options, $templatePath);
+        $tmpFile = tempnam(sys_get_temp_dir(), 'export_') . '.xlsx';
+        $this->exporter->exportToFile($tmpFile, $schema, $templatePath);
         $bytes = file_get_contents($tmpFile);
         @unlink($tmpFile);
 
-        return (string)$bytes;
-    }
-
-    public function getMode(): string
-    {
-        return $this->mode;
+        return $bytes;
     }
 }

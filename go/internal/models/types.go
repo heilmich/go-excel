@@ -1,18 +1,16 @@
 package models
 
-// Based on the user request and documentation.
+// This file defines the shared structures for API requests and internal processing.
 
-// Orientation defines the direction of data processing in a block.
+// --- Enums ---
+
 type Orientation string
-
 const (
 	Vertical   Orientation = "vertical"
 	Horizontal Orientation = "horizontal"
 )
 
-// DataType defines the type of data in a column for validation.
 type DataType string
-
 const (
 	TypeString   DataType = "string"
 	TypeInt      DataType = "int"
@@ -22,97 +20,83 @@ const (
 	TypeDateTime DataType = "datetime"
 )
 
-// Column defines a single column or row within a block/table.
+// --- Core Data Structures ---
+
 type Column struct {
-	Name         string   `json:"name"`                   // Key for data mapping, required.
-	Header       string   `json:"header,omitempty"`       // Display text in the header row (for import/export).
-	Column       string   `json:"column,omitempty"`       // Column letter, e.g. "A" (for import).
-	Type         DataType `json:"type"`                   // Data type for validation, required.
-	CustomFormat string   `json:"customFormat,omitempty"` // Excel custom format string.
-	Width        float64  `json:"width,omitempty"`        // Column width.
-
-	// Validation fields from docs
-	Required bool     `json:"required,omitempty"`
-	MinLen   int      `json:"minLen,omitempty"`
-	MaxLen   int      `json:"maxLen,omitempty"`
-	Regex    string   `json:"regex,omitempty"`
-	Enum     []string `json:"enum,omitempty"`
-	Min      *float64 `json:"min,omitempty"`
-	Max      *float64 `json:"max,omitempty"`
-	Trim     bool     `json:"trim"` // Defaults to true in docs
-
-	// Date-related fields
-	DateFormat string `json:"dateFormat,omitempty"`
-	Timezone   string `json:"timezone,omitempty"`
+	Name         string   `json:"name"`
+	Header       string   `json:"header,omitempty"`
+	Column       string   `json:"column,omitempty"`
+	Type         DataType `json:"type"`
+	CustomFormat string   `json:"customFormat,omitempty"`
+	Width        float64  `json:"width,omitempty"`
+	Required     bool     `json:"required,omitempty"`
+	MinLen       int      `json:"minLen,omitempty"`
+	MaxLen       int      `json:"maxLen,omitempty"`
+	Regex        string   `json:"regex,omitempty"`
+	Enum         []string `json:"enum,omitempty"`
+	Min          *float64 `json:"min,omitempty"`
+	Max          *float64 `json:"max,omitempty"`
+	Trim         bool     `json:"trim"`
+	DateFormat   string   `json:"dateFormat,omitempty"`
+	Timezone     string   `json:"timezone,omitempty"`
 }
 
-// Block defines a rectangular area of cells for export.
+// Block is a generic container for data at a specific location.
+// It uses the default columns defined on its parent Sheet.
 type Block struct {
-	StartCell   string                 `json:"startCell,omitempty"`   // e.g., "A2"
-	StartRow    int                    `json:"startRow,omitempty"`    // e.g., 12 (1-based)
-	StartCol    string                 `json:"startCol,omitempty"`    // e.g., "C"
-	Orientation Orientation            `json:"orientation,omitempty"` // "vertical" or "horizontal", defaults to vertical.
-	ShowHeaders bool                   `json:"showHeaders"`           // If true, headers from the main schema are printed.
-	Data        []map[string]interface{} `json:"data"`                  // Array of data objects.
+	StartCell   string                 `json:"startCell,omitempty"`
+	StartRow    int                    `json:"startRow,omitempty"`
+	StartCol    string                 `json:"startCol,omitempty"`
+	Orientation Orientation            `json:"orientation,omitempty"`
+	ShowHeaders bool                   `json:"showHeaders"` // Defaults to false for blocks
+	Data        []map[string]interface{} `json:"data"`
 }
 
-// Table is a user-friendly alias for a Block with a defined set of columns.
-// The user mentioned "Table" is a wrapper for a block.
+// Table is a self-contained block that has its own column definitions.
 type Table struct {
-	Block
-	Columns []Column `json:"columns"`
+	StartCell   string                 `json:"startCell,omitempty"`
+	StartRow    int                    `json:"startRow,omitempty"`
+	StartCol    string                 `json:"startCol,omitempty"`
+	Orientation Orientation            `json:"orientation,omitempty"`
+	ShowHeaders bool                   `json:"showHeaders"` // Defaults to true for tables
+	Data        []map[string]interface{} `json:"data"`
+	Columns     []Column               `json:"columns"`
 }
 
-// Formula defines a formula to be applied to a range of cells.
 type Formula struct {
-	Column   string `json:"column"`             // e.g., "C"
-	StartRow int    `json:"startRow"`           // 1-based
-	EndRow   int    `json:"endRow"`             // 1-based, inclusive. 0 means to the end of data.
-	Expr     string `json:"expr"`               // Formula expression, e.g., "=B{row}*1.2"
+	Column   string `json:"column"`
+	StartRow int    `json:"startRow"`
+	EndRow   int    `json:"endRow"`
+	Expr     string `json:"expr"`
 }
 
-// Options defines global options for the export.
 type Options struct {
-	Freeze     string `json:"freeze,omitempty"`     // e.g., "A2"
-	AutoFilter string `json:"autofilter,omitempty"` // e.g., "A1:C100"
+	Freeze     string `json:"freeze,omitempty"`
+	AutoFilter string `json:"autofilter,omitempty"`
 }
 
-// ExportRequest is the main structure for an export request.
-type ExportRequest struct {
-	Sheet          string                 `json:"sheet,omitempty"`     // Target sheet name. If empty, first sheet.
-	SheetIndex     int                    `json:"sheetIndex,omitempty"`  // Target sheet index (0-based).
-	HeaderRow      int                    `json:"headerRow,omitempty"`   // 1-based, for legacy `rows` block.
-	StartRow       int                    `json:"startRow,omitempty"`    // 1-based, for legacy `rows` block.
-	Columns        []Column               `json:"columns"`             // Defines the columns for legacy `rows` and default for `blocks`.
-	Rows           []map[string]interface{} `json:"rows,omitempty"`      // Legacy continuous data block.
-	Blocks         []Block                `json:"blocks,omitempty"`    // Disjoint data blocks.
-	Tables         []Table                `json:"tables,omitempty"`    // Tables (blocks with their own columns).
-	Formulas       []Formula              `json:"formulas,omitempty"`
-	Options        Options                `json:"options,omitempty"`
-	TemplateBase64 string                 `json:"templateBase64,omitempty"`
+type Sheet struct {
+	Name           string    `json:"sheet,omitempty"`
+	Index          int       `json:"sheetIndex,omitempty"`
+	HeaderRow      int       `json:"headerRow,omitempty"` // For import
+	StartRow       int       `json:"startRow,omitempty"`  // For import
+	DefaultColumns []Column  `json:"columns,omitempty"` // For Blocks
+	Blocks         []Block   `json:"blocks,omitempty"`
+	Tables         []Table   `json:"tables,omitempty"`
+	Formulas       []Formula `json:"formulas,omitempty"`
+	Options        Options   `json:"options,omitempty"`
 }
 
-// ImportSchema defines the structure for an import operation.
-// Based on the docs, import is simpler and row-based.
-type ImportSchema struct {
-	Sheet       string   `json:"sheet,omitempty"`    // Name of the sheet to import.
-	SheetIndex  int      `json:"sheetIndex,omitempty"` // Index of the sheet (0-based).
-	HeaderRow   int      `json:"headerRow"`          // Row number of the header (1-based). 0 for no header.
-	StartRow    int      `json:"startRow"`           // First row of data (1-based).
-	Columns     []Column `json:"columns"`
+// --- API Request/Response Structures ---
+
+// Request is the main structure for all API requests.
+type Request struct {
+	Sheets         []Sheet `json:"sheets"`
+	TemplateBase64 string  `json:"templateBase64,omitempty"`
 }
 
-// ImportResultLine represents a single line of output in NDJSON format for import.
-type ImportResultLine struct {
-	OK       bool              `json:"ok"`
-	RowIndex int               `json:"rowIndex"`
-	Data     map[string]interface{} `json:"data,omitempty"`
-	Errors   []ValidationError `json:"errors,omitempty"`
-}
-
-// ValidationError represents a single validation error for a field.
-type ValidationError struct {
-	Field string `json:"field"`
-	Code  string `json:"code"`
-	Msg   string `json:"msg"`
+// ImportResult is the new structure for the entire import response.
+type ImportResult struct {
+	Data   map[string]map[string][]map[string]interface{} `json:"data"` // SheetName -> BlockIdentifier -> []RowData
+	Errors []string                                     `json:"errors,omitempty"`
 }

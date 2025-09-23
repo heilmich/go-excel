@@ -19,8 +19,8 @@ func HandleImport(schemaPath, filePath string) {
 	}
 	defer schemaFile.Close()
 
-	var schema models.ImportSchema
-	if err := json.NewDecoder(schemaFile).Decode(&schema); err != nil {
+	var request models.Request
+	if err := json.NewDecoder(schemaFile).Decode(&request); err != nil {
 		log.Fatalf("Failed to parse schema JSON: %v", err)
 	}
 
@@ -31,10 +31,18 @@ func HandleImport(schemaPath, filePath string) {
 	defer excelFile.Close()
 
 	fmt.Fprintf(os.Stderr, "Importing data...\n")
-	importer := excel.NewImporter(excelFile, schema, os.Stdout)
-	if err := importer.Process(); err != nil {
+	importer := excel.NewImporter(excelFile, &request)
+	result, err := importer.Process()
+	if err != nil {
 		log.Fatalf("Error during import: %v", err)
 	}
+
+	jsonOutput, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		log.Fatalf("Failed to serialize result to JSON: %v", err)
+	}
+
+	fmt.Println(string(jsonOutput))
 	fmt.Fprintf(os.Stderr, "Import complete.\n")
 }
 
@@ -45,7 +53,7 @@ func HandleExport(requestPath, outputPath, templatePath string) {
 		log.Fatalf("Failed to read request file: %v", err)
 	}
 
-	var request models.ExportRequest
+	var request models.Request
 	if err := json.Unmarshal(requestBytes, &request); err != nil {
 		log.Fatalf("Failed to parse request JSON: %v", err)
 	}
@@ -59,7 +67,7 @@ func HandleExport(requestPath, outputPath, templatePath string) {
 	}
 
 	fmt.Fprintf(os.Stderr, "Generating Excel file...\n")
-	exporter := excel.NewExporter(request, templateBytes)
+	exporter := excel.NewExporter(&request, templateBytes)
 	resultBytes, err := exporter.Process()
 	if err != nil {
 		log.Fatalf("Failed to generate Excel file: %v", err)

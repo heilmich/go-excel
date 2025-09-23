@@ -1,11 +1,9 @@
 package api
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
-	"log"
 	"strings"
 
 	"chelbit/excelms/internal/excel"
@@ -20,9 +18,7 @@ type Server struct {
 }
 
 func NewServer(authToken string) *fiber.App {
-	app := fiber.New(fiber.Config{
-		BodyLimit: 50 * 1024 * 1024,
-	})
+	app := fiber.New(fiber.Config{ BodyLimit: 50 * 1024 * 1024 })
 	app.Use(logger.New())
 	s := &Server{app: app, authToken: authToken}
 	s.registerRoutes()
@@ -41,9 +37,6 @@ func (s *Server) registerRoutes() {
 
 func (s *Server) authMiddleware(c *fiber.Ctx) error {
 	authHeader := c.Get("Authorization")
-	if authHeader == "" {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Missing authorization header"})
-	}
 	parts := strings.Split(authHeader, " ")
 	if len(parts) != 2 || parts[0] != "Bearer" {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Malformed authorization header"})
@@ -64,8 +57,8 @@ func (s *Server) handleImport(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "schema field is required"})
 	}
 
-	var schema models.ImportSchema
-	if err := json.Unmarshal([]byte(schemaJSON), &schema); err != nil {
+	var request models.Request
+	if err := json.Unmarshal([]byte(schemaJSON), &request); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "failed to parse schema JSON", "details": err.Error()})
 	}
 
@@ -80,27 +73,17 @@ func (s *Server) handleImport(c *fiber.Ctx) error {
 	}
 	defer file.Close()
 
-	c.Set("Content-Type", "application/x-ndjson")
-	c.Set("Transfer-Encoding", "chunked")
+	importer := excel.NewImporter(file, &request)
+	result, err := importer.Process()
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to process import", "details": err.Error()})
+	}
 
-	// Use a stream writer for memory efficiency
-	c.Context().SetBodyStreamWriter(func(w *bufio.Writer) {
-		importer := excel.NewImporter(file, schema, w)
-		if err := importer.Process(); err != nil {
-			// We can't write a JSON error here as the headers are already sent.
-			// We can log it. The client will see a broken stream.
-			log.Printf("Error during import processing: %v", err)
-		}
-		if err := w.Flush(); err != nil {
-			log.Printf("Error flushing stream writer: %v", err)
-		}
-	})
-
-	return nil
+	return c.Status(fiber.StatusOK).JSON(result)
 }
 
 func (s *Server) handleExport(c *fiber.Ctx) error {
-	var request models.ExportRequest
+	var request models.Request
 	var templateBytes []byte
 
 	contentType := c.Get("Content-Type")
@@ -111,9 +94,7 @@ func (s *Server) handleExport(c *fiber.Ctx) error {
 		}
 		if templateFile, err := c.FormFile("template"); err == nil {
 			file, err := templateFile.Open()
-			if err != nil {
-				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to open template file"})
-			}
+			if err != nil { return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to open template file"}) }
 			defer file.Close()
 			buf := new(bytes.Buffer)
 			if _, err := buf.ReadFrom(file); err != nil {
@@ -121,7 +102,7 @@ func (s *Server) handleExport(c *fiber.Ctx) error {
 			}
 			templateBytes = buf.Bytes()
 		}
-	} else { // Assume application/json
+	} else {
 		if err := c.BodyParser(&request); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "failed to parse JSON body", "details": err.Error()})
 		}
@@ -135,7 +116,7 @@ func (s *Server) handleExport(c *fiber.Ctx) error {
 		templateBytes = decoded
 	}
 
-	exporter := excel.NewExporter(request, templateBytes)
+	exporter := excel.NewExporter(&request, templateBytes)
 	resultBytes, err := exporter.Process()
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to generate excel file", "details": err.Error()})

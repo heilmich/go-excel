@@ -100,25 +100,9 @@ final class HttpClient
         }
     }
 
-    public function export(array $rows, $schema, array $formulas = [], array $options = [], ?string $templatePath = null): string
+    public function export(Schema $schema, ?string $templatePath = null): string
     {
-        $schemaObj = Schema::fromMixed($schema);
-
-        // My Go service expects a more complex request body than this simple function provides.
-        // I will adapt my Go service to be compatible with this simpler payload format.
-        // This PHP code sends `rows` and `columns` at the top level.
-        // My Go service expects `blocks`, `tables`, etc.
-        // For now, I will use this code and later I might need to adjust the Go service.
-        // Let's create the payload as this client expects to send it.
-        $payload = [
-            'sheet' => $schemaObj->sheet ?? 'Sheet1',
-            'headerRow' => $schemaObj->headerRow,
-            'startRow' => $schemaObj->startRow,
-            'columns' => array_map(fn($c) => $c->jsonSerialize(), $schemaObj->columns),
-            'rows' => $rows,
-            'formulas' => $formulas,
-            'options' => $options,
-        ];
+        $payload = $schema->jsonSerialize();
 
         if ($templatePath && is_file($templatePath)) {
             $ch = curl_init($this->baseUrl . '/api/export');

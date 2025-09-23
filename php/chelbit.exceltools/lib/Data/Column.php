@@ -1,64 +1,65 @@
 <?php
 namespace Chelbit\Exceltools\Data;
 
-final class Column implements \JsonSerializable
+use JsonSerializable;
+
+final class Column implements JsonSerializable
 {
     public string $name;
-    public ?string $column = null;  // 'A','B',...
-    public ?string $header = null;  // заголовок
     public string $type;
+    public ?string $header;
+    public ?string $column;
 
-    // валидация
-    public bool $required = false;
-    public ?int $minLen = null;
-    public ?int $maxLen = null;
-    public ?string $regex = null;
-    public array $enum = [];
-    public ?float $min = null;
-    public ?float $max = null;
+    public ?string $customFormat;
+    public ?float $width;
 
-    // даты
-    public ?string $dateFormat = null;
-    public ?string $timezone = null;
+    public bool $required;
+    public bool $trim;
+    public ?int $minLen;
+    public ?int $maxLen;
+    public ?string $regex;
+    public array $enum;
+    public ?float $min;
+    public ?float $max;
 
-    // прочее
-    public bool $trim = true;
+    public ?string $dateFormat;
+    public ?string $timezone;
 
-    // экспорт
-    public ?string $customFormat = null;
-    public ?float $width = null;
+    public function __construct(
+        string $name,
+        string $type,
+        ?string $header = null,
+        bool $required = false,
+        // Add all other properties as optional constructor args if needed
+    ) {
+        $this->name = $name;
+        $this->type = $type;
+        $this->header = $header;
+        $this->required = $required;
 
-    public function __construct(string $name, string $type){ $this->name=$name; $this->type=$type; }
-
-    public static function byHeader(string $name, string $header, string $type): self { $c=new self($name,$type); $c->header=$header; return $c; }
-    public static function byColumn(string $name, string $column, string $type): self { $c=new self($name,$type); $c->column=strtoupper($column); return $c; }
-
-    /** Создать колонку из массива (как в JSON-схеме). */
-    public static function fromArray(array $a): self
-    {
-        if (!isset($a['name'], $a['type'])) {
-            throw new \InvalidArgumentException('Column.fromArray: required: name,type');
-        }
-        $c = new self((string)$a['name'], (string)$a['type']);
-        $c->column = isset($a['column']) ? (string)$a['column'] : null;
-        $c->header = isset($a['header']) ? (string)$a['header'] : null;
-        $c->required = (bool)($a['required'] ?? false);
-        $c->minLen = isset($a['minLen']) ? (int)$a['minLen'] : null;
-        $c->maxLen = isset($a['maxLen']) ? (int)$a['maxLen'] : null;
-        $c->regex  = isset($a['regex']) ? (string)$a['regex'] : null;
-        $c->enum   = isset($a['enum']) && is_array($a['enum']) ? array_values($a['enum']) : [];
-        $c->min    = isset($a['min']) ? (float)$a['min'] : null;
-        $c->max    = isset($a['max']) ? (float)$a['max'] : null;
-        $c->dateFormat = isset($a['dateFormat']) ? (string)$a['dateFormat'] : null;
-        $c->timezone   = isset($a['timezone']) ? (string)$a['timezone'] : null;
-        $c->trim       = isset($a['trim']) ? (bool)$a['trim'] : true;
-        $c->customFormat = isset($a['customFormat']) ? (string)$a['customFormat'] : null;
-        $c->width = isset($a['width']) ? (float)$a['width'] : null;
-        return $c;
+        // Set defaults for non-nullable properties
+        $this->trim = true;
+        $this->enum = [];
     }
 
-    public function jsonSerialize(): mixed
+    public static function create(string $name, string $type, ?string $header = null, bool $required = false): self
     {
-        return array_filter(get_object_vars($this), fn($v) => $v !== null);
+        return new self($name, $type, $header, $required);
+    }
+
+    // Fluent setters for optional properties
+    public function setHeader(string $header): self { $this->header = $header; return $this; }
+    public function setColumn(string $column): self { $this->column = strtoupper($column); return $this; }
+    public function setRequired(bool $required = true): self { $this->required = $required; return $this; }
+    public function setWidth(float $width): self { $this->width = $width; return $this; }
+    public function setCustomFormat(string $format): self { $this->customFormat = $format; return $this; }
+    // ... etc for all other properties
+
+    public function jsonSerialize(): array
+    {
+        // Use get_object_vars to get all public properties
+        $vars = get_object_vars($this);
+        // Filter out null values to keep the JSON clean
+        return array_filter($vars, fn($value) => $value !== null);
     }
 }

@@ -1,63 +1,37 @@
 <?php
 namespace Chelbit\Exceltools\Data;
 
-use Chelbit\Exceltools\Data\Column;
+use JsonSerializable;
 
-final class Schema implements \JsonSerializable
+/**
+ * Represents the entire file schema, containing one or more sheets.
+ */
+final class Schema implements JsonSerializable
 {
-    public ?string $sheet = null;
-    public int $headerRow = 1;
-    public int $startRow = 2;
-    /** @var Column[] */
-    public array $columns = [];
+    /** @var Sheet[] */
+    private array $sheets = [];
 
-    public function __construct(array $columns, ?string $sheet=null, int $headerRow=1, int $startRow=2)
+    public function __construct(array $sheets = [])
     {
-        $this->columns = $columns; $this->sheet = $sheet; $this->headerRow = $headerRow; $this->startRow = $startRow;
+        $this->sheets = $sheets;
     }
 
-    /** Универсальный конструктор: принимает Schema|array|json-string. */
-    public static function fromMixed($v): self
+    public static function create(array $sheets = []): self
     {
-        if ($v instanceof self) { return $v; }
-        if (is_string($v)) { return self::fromJson($v); }
-        if (is_array($v)) { return self::fromArray($v); }
-        throw new \InvalidArgumentException('Schema.fromMixed: ожидается Schema|array|json-string');
+        return new self($sheets);
     }
 
-    /** Создать из JSON-строки. */
-    public static function fromJson(string $json): self
+    public function addSheet(Sheet $sheet): self
     {
-        $a = json_decode($json, true);
-        if (!is_array($a)) {
-            throw new \InvalidArgumentException('Schema.fromJson: не удалось разобрать JSON');
-        }
-        return self::fromArray($a);
+        $this->sheets[] = $sheet;
+        return $this;
     }
 
-    /** Создать из ассоциативного массива (как в JSON). */
-    public static function fromArray(array $a): self
+    public function jsonSerialize(): array
     {
-        $cols = [];
-        if (!isset($a['columns']) || !is_array($a['columns']) || count($a['columns']) === 0) {
-            throw new \InvalidArgumentException('Schema.fromArray: columns пуст');
-        }
-        foreach ($a['columns'] as $c) {
-            if ($c instanceof Column) { $cols[] = $c; }
-            elseif (is_array($c)) { $cols[] = Column::fromArray($c); }
-            else { throw new \InvalidArgumentException('Schema.fromArray: неподдерживаемая колонка'); }
-        }
-        $sheet = isset($a['sheet']) ? (string)$a['sheet'] : null;
-        $headerRow = isset($a['headerRow']) ? (int)$a['headerRow'] : 1;
-        $startRow  = isset($a['startRow']) ? (int)$a['startRow'] : 2;
-        return new self($cols, $sheet, $headerRow, $startRow);
-    }
-
-    public function jsonSerialize(): mixed
-    {
+        // The Go service will be updated to expect this nested structure.
         return [
-            'sheet'=>$this->sheet, 'headerRow'=>$this->headerRow, 'startRow'=>$this->startRow,
-            'columns'=>array_map(fn(Column $c)=>$c->jsonSerialize(), $this->columns),
+            'sheets' => $this->sheets,
         ];
     }
 }

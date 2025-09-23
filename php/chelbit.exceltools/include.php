@@ -14,6 +14,9 @@ Loader::registerAutoLoadClasses(
         'Chelbit\\Exceltools\\Data\\Column' => 'lib/Data/Column.php',
         'Chelbit\\Exceltools\\Data\\Schema' => 'lib/Data/Schema.php',
         'Chelbit\\Exceltools\\Data\\Validator' => 'lib/Data/Validator.php',
+        'Chelbit\\Exceltools\\Data\\Sheet' => 'lib/Data/Sheet.php',
+        'Chelbit\\Exceltools\\Data\\Block' => 'lib/Data/Block.php',
+        'Chelbit\\Exceltools\\Data\\Table' => 'lib/Data/Table.php',
 
         // Enums
         'Chelbit\\Exceltools\\Enums\\Mode' => 'lib/Enums/Mode.php',
