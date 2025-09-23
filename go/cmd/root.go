@@ -1,12 +1,10 @@
 package cmd
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"strconv"
 
-	"chelbit/excelms/internal/api"
 	"github.com/spf13/cobra"
 )
 
@@ -23,9 +21,13 @@ var rootCmd = &cobra.Command{
 	Long:  `A versatile tool that can run as a CLI or as a web service to handle complex Excel import and export tasks based on a JSON schema.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		if serve {
-			startServer()
+			// This will block and run the service.
+			// The service library handles whether it's running interactively or as a managed service.
+			if err := svc.Run(); err != nil {
+				log.Fatal(err)
+			}
 		} else {
-			// If no subcommand is given and not in serve mode, show help.
+			// If not in serve mode and no command is given, show help.
 			if err := cmd.Help(); err != nil {
 				log.Fatalf("Failed to show help: %v", err)
 			}
@@ -51,21 +53,6 @@ func Execute() error {
 }
 
 func startServer() {
-	fmt.Printf("Starting server on port %d...\n", port)
-
-	// Get auth token from env
 	authToken := os.Getenv("AUTH_TOKEN")
-	if authToken == "" {
-		fmt.Println("AUTH_TOKEN not set, running in insecure mode.")
-	}
-
-	// Initialize and run the Fiber app
-	app := api.NewServer(authToken)
-
-	// The Listen function blocks until the server is stopped.
-	// We need to handle the potential error it returns.
-	err := app.Listen(fmt.Sprintf(":%d", port))
-	if err != nil {
-		log.Fatalf("Failed to start server: %v", err)
-	}
+	runServer(port, authToken)
 }
