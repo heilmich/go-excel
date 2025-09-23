@@ -100,39 +100,47 @@ func (e *Exporter) Process() ([]byte, error) {
 // ### Helper methods for Exporter ###
 
 func (e *Exporter) getTargetSheet() (string, error) {
+	f := e.file
 	name := e.request.Sheet
 	index := e.request.SheetIndex
-	f := e.file
 
+	// If a name is provided, it takes priority.
 	if name != "" {
-		sheetIndex, err := f.GetSheetIndex(name)
-		if err != nil {
-			newIndex, err := f.NewSheet(name)
-			if err != nil { return "", fmt.Errorf("failed to create sheet '%s': %w", name, err) }
-			f.SetActiveSheet(newIndex)
-			if len(f.GetSheetList()) > 1 {
-				if _, err := f.GetSheetIndex("Sheet1"); err == nil && name != "Sheet1" {
-					if rows, err := f.GetRows("Sheet1"); err == nil && len(rows) == 0 {
-						_ = f.DeleteSheet("Sheet1")
-					}
-				}
+		// Simplest case: new file with a single default "Sheet1", and user wants a different name. Just rename it.
+		if f.SheetCount == 1 && f.GetSheetName(0) == "Sheet1" {
+			if err := f.SetSheetName("Sheet1", name); err != nil {
+				return "", fmt.Errorf("failed to rename default sheet: %w", err)
 			}
+			// SetActiveSheet is not needed as there's only one sheet.
 			return name, nil
 		}
-		f.SetActiveSheet(sheetIndex)
+
+		// Otherwise, check if the sheet exists.
+		if idx, err := f.GetSheetIndex(name); err == nil {
+			f.SetActiveSheet(idx)
+			return name, nil
+		}
+
+		// If it doesn't exist, create it.
+		idx, err := f.NewSheet(name)
+		if err != nil {
+			return "", fmt.Errorf("failed to create new sheet '%s': %w", name, err)
+		}
+		f.SetActiveSheet(idx)
 		return name, nil
 	}
 
+	// If no name, try index.
 	if index > 0 {
 		sheetList := f.GetSheetList()
-		if index < len(sheetList) { return sheetList[index], nil }
+		if index < len(sheetList) {
+			return sheetList[index], nil
+		}
 		return "", fmt.Errorf("sheet index %d is out of bounds", index)
 	}
 
-	if len(f.GetSheetList()) > 0 {
-		return f.GetSheetName(f.GetActiveSheetIndex()), nil
-	}
-	return "Sheet1", nil
+	// Fallback to the default active sheet.
+	return f.GetSheetName(f.GetActiveSheetIndex()), nil
 }
 
 func (e *Exporter) writeBlock(cols []models.Column, data []map[string]interface{}, startCol, dataStartRow, headerRow int, showHeaders bool, orientation models.Orientation, styleCache map[string]int) error {

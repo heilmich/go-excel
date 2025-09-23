@@ -1,0 +1,81 @@
+{
+  "sheet": "Итоговый отчет",
+  "columns": [
+    {
+      "name": "id",
+      "header": "ID",
+      "type": "int"
+    },
+    {
+      "name": "product_name",
+      "header": "Название продукта",
+      "type": "string",
+      "width": 40
+    },
+    {
+      "name": "quantity",
+      "header": "Кол-во",
+      "type": "int"
+    },
+    {
+      "name": "price",
+      "header": "Цена за шт.",
+      "type": "float",
+      "customFormat": "#,##0.00 ₽"
+    },
+    {
+      "name": "total",
+      "header": "Сумма",
+      "type": "float",
+      "customFormat": "#,##0.00 ₽"
+    }
+  ],
+  "headerRow": 1,
+  "startRow": 2,
+  "rows": [
+    {
+      "id": 101,
+      "product_name": "Ноутбук \"Молния-15\"",
+      "quantity": 5,
+      "price": 75000.50
+    },
+    {
+      "id": 102,
+      "product_name": "Монитор \"Ясный Взгляд 27\"",
+      "quantity": 10,
+      "price": 22500.00
+    }
+  ],
+  "blocks": [
+    {
+      "startCell": "A10",
+      "showHeaders": true,
+      "data": [
+        {
+          "id": 201,
+          "product_name": "Клавиатура \"Тихий Щелчок\"",
+          "quantity": 15,
+          "price": 4500.99
+        }
+      ]
+    }
+  ],
+  "formulas": [
+    {
+      "column": "E",
+      "startRow": 2,
+      "endRow": 3,
+      "expr": "=C{row}*D{row}"
+    },
+    {
+      "column": "E",
+      "startRow": 10,
+      "endRow": 10,
+      "expr": "=C{row}*D{row}"
+    }
+  ],
+  "options": {
+    "freeze": "B2",
+    "autofilter": "A1:E1"
+  }
+}
