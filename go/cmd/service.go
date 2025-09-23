@@ -48,7 +48,7 @@ func init() {
 		Name:        "ExcelMS",
 		DisplayName: "Excel Microservice",
 		Description: "Service for importing and exporting Excel files.",
-		Arguments:   []string{"--serve"}, // When run as a service, always use the --serve flag
+		Arguments:   []string{"run-as-service"}, // Use the hidden command when running as a service
 	}
 
 	var err error

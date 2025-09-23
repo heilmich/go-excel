@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"log"
 	"os"
 	"strconv"
 
@@ -9,10 +8,8 @@ import (
 )
 
 var (
-	serve      bool
-	port       int
-	importCmd  *cobra.Command
-	exportCmd  *cobra.Command
+	serve     bool
+	port      int
 )
 
 var rootCmd = &cobra.Command{
@@ -20,31 +17,25 @@ var rootCmd = &cobra.Command{
 	Short: "ExcelMS is a microservice for importing and exporting Excel files.",
 	Long:  `A versatile tool that can run as a CLI or as a web service to handle complex Excel import and export tasks based on a JSON schema.`,
 	Run: func(cmd *cobra.Command, args []string) {
+		// This logic only runs if no subcommand is specified.
 		if serve {
-			// This will block and run the service.
-			// The service library handles whether it's running interactively or as a managed service.
-			if err := svc.Run(); err != nil {
-				log.Fatal(err)
-			}
+			// Run the server interactively in the foreground.
+			startServer()
 		} else {
-			// If not in serve mode and no command is given, show help.
-			if err := cmd.Help(); err != nil {
-				log.Fatalf("Failed to show help: %v", err)
-			}
-			os.Exit(0)
+			// Default behavior: show help.
+			_ = cmd.Help()
 		}
 	},
 }
 
 func init() {
-	// Persistent flags, available to all subcommands
-	rootCmd.PersistentFlags().BoolVarP(&serve, "serve", "s", false, "Run in server mode")
+	rootCmd.PersistentFlags().BoolVarP(&serve, "serve", "s", false, "Run server interactively in the foreground")
 
-	// Get port from env, with a default
 	defaultPort := 8080
 	if envPort, err := strconv.Atoi(os.Getenv("PORT")); err == nil {
 		defaultPort = envPort
 	}
+	// Port needs to be persistent so other commands (like service) can see it.
 	rootCmd.PersistentFlags().IntVarP(&port, "port", "p", defaultPort, "Port to run the server on")
 }
 
