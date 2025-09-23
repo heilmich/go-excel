@@ -1,6 +1,7 @@
 <?php
-namespace Chelbit\Exceltools;
+namespace Chelbit\Exceltools\Cli;
 
+use Chelbit\Exceltools\Data\Schema;
 use Generator;
 use RuntimeException;
 

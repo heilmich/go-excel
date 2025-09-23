@@ -1,6 +1,6 @@
 <?php
 
-namespace Chelbit\Exceltools;
+namespace Chelbit\Exceltools\Enums;
 
 class Types
 {

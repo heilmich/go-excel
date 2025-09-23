@@ -1,5 +1,7 @@
 <?php
-namespace Chelbit\Exceltools;
+namespace Chelbit\Exceltools\Http;
+
+use Chelbit\Exceltools\Data\Schema;
 
 final class HttpClient
 {

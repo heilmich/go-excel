@@ -1,5 +1,5 @@
 <?php
-namespace Chelbit\Exceltools;
+namespace Chelbit\Exceltools\Data;
 
 final class Column implements \JsonSerializable
 {

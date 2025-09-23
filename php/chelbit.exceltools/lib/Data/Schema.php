@@ -1,5 +1,7 @@
 <?php
-namespace Chelbit\Exceltools;
+namespace Chelbit\Exceltools\Data;
+
+use Chelbit\Exceltools\Data\Column;
 
 final class Schema implements \JsonSerializable
 {

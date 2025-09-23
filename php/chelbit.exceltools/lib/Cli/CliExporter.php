@@ -1,6 +1,7 @@
 <?php
-namespace Chelbit\Exceltools;
+namespace Chelbit\Exceltools\Cli;
 
+use Chelbit\Exceltools\Data\Schema;
 use RuntimeException;
 
 final class CliExporter

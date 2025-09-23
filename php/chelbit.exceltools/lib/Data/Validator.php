@@ -1,5 +1,7 @@
 <?php
-namespace Chelbit\Exceltools;
+namespace Chelbit\Exceltools\Data;
+
+use Chelbit\Exceltools\Enums\Types;
 
 final class Validator
 {

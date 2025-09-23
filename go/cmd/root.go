@@ -44,11 +44,6 @@ func init() {
 		defaultPort = envPort
 	}
 	rootCmd.PersistentFlags().IntVarP(&port, "port", "p", defaultPort, "Port to run the server on")
-
-	// Add subcommands here
-	// (we will create these files next)
-	// rootCmd.AddCommand(importCmd)
-	// rootCmd.AddCommand(exportCmd)
 }
 
 func Execute() error {
