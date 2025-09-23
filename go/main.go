@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/chelbit/excelms/cmd"
+	"chelbit/excelms/cmd"
 	"github.com/joho/godotenv"
 )
 

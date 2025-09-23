@@ -6,7 +6,7 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/chelbit/excelms/internal/api"
+	"chelbit/excelms/internal/api"
 	"github.com/spf13/cobra"
 )
 

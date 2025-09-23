@@ -8,8 +8,8 @@ import (
 	"log"
 	"strings"
 
-	"github.com/chelbit/excelms/internal/excel"
-	"github.com/chelbit/excelms/internal/models"
+	"chelbit/excelms/internal/excel"
+	"chelbit/excelms/internal/models"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 )
@@ -85,7 +85,8 @@ func (s *Server) handleImport(c *fiber.Ctx) error {
 
 	// Use a stream writer for memory efficiency
 	c.Context().SetBodyStreamWriter(func(w *bufio.Writer) {
-		if err := excel.ImportProcessor(file, schema, w); err != nil {
+		importer := excel.NewImporter(file, schema, w)
+		if err := importer.Process(); err != nil {
 			// We can't write a JSON error here as the headers are already sent.
 			// We can log it. The client will see a broken stream.
 			log.Printf("Error during import processing: %v", err)
@@ -134,7 +135,8 @@ func (s *Server) handleExport(c *fiber.Ctx) error {
 		templateBytes = decoded
 	}
 
-	resultBytes, err := excel.ExportProcessor(request, templateBytes)
+	exporter := excel.NewExporter(request, templateBytes)
+	resultBytes, err := exporter.Process()
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to generate excel file", "details": err.Error()})
 	}

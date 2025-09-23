@@ -7,8 +7,8 @@ import (
 	"log"
 	"os"
 
-	"github.com/chelbit/excelms/internal/excel"
-	"github.com/chelbit/excelms/internal/models"
+	"chelbit/excelms/internal/excel"
+	"chelbit/excelms/internal/models"
 )
 
 // HandleImport is the CLI handler for the import command.
@@ -31,7 +31,8 @@ func HandleImport(schemaPath, filePath string) {
 	defer excelFile.Close()
 
 	fmt.Fprintf(os.Stderr, "Importing data...\n")
-	if err := excel.ImportProcessor(excelFile, schema, os.Stdout); err != nil {
+	importer := excel.NewImporter(excelFile, schema, os.Stdout)
+	if err := importer.Process(); err != nil {
 		log.Fatalf("Error during import: %v", err)
 	}
 	fmt.Fprintf(os.Stderr, "Import complete.\n")
@@ -58,7 +59,8 @@ func HandleExport(requestPath, outputPath, templatePath string) {
 	}
 
 	fmt.Fprintf(os.Stderr, "Generating Excel file...\n")
-	resultBytes, err := excel.ExportProcessor(request, templateBytes)
+	exporter := excel.NewExporter(request, templateBytes)
+	resultBytes, err := exporter.Process()
 	if err != nil {
 		log.Fatalf("Failed to generate Excel file: %v", err)
 	}

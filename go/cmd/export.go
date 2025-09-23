@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/chelbit/excelms/internal/cli"
+	"chelbit/excelms/internal/cli"
 	"github.com/spf13/cobra"
 )
 
