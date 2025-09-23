@@ -19,9 +19,9 @@
 
 -   **Content-Type**: `multipart/form-data`.
 -   **Тело запроса**:
-    -   `schema`: Поле формы, содержащее JSON-схему для импорта. Схема должна определять Листы и Блоки/Таблицы, из которых нужно извлечь данные.
+    -   `schema`: Поле формы, содержащее JSON-схему для импорта. Схема должна определять Листы и Блоки/Таблицы, из которых нужно извлечь данные. В каждом блоке можно указать опциональный строковый `id`.
     -   `file`: Файл `.xlsx` для парсинга.
--   **Ответ `200 OK`**: Единый JSON-объект, сгруппированный по листам и блокам.
+-   **Ответ `200 OK`**: Единый JSON-объект, сгруппированный по листам и идентификаторам блоков.
 
 **Пример ответа импорта:**
 
@@ -29,7 +29,7 @@
 {
   "data": {
     "ИменаСотрудников": {
-      "block_A1": [
+      "main_users_block": [
         { "name": "Иван", "surname": "Петров" },
         { "name": "Анна", "surname": "Сидорова" }
       ]
@@ -57,26 +57,18 @@ use Chelbit\Exceltools\Data\Table;
 use Chelbit\Exceltools\Data\Column;
 use Chelbit\Exceltools\Enums\Types;
 
-// 1. Готовим данные
-$users = [['name' => 'Иван Петров'], ['name' => 'Анна Сидорова']];
-
-// 2. Описываем структуру через объекты
 $schema = Schema::create([
     Sheet::create('Пользователи')->addBlock(
-        // Таблица - это Блок, который по умолчанию выводит заголовки
         Table::create('A1', [
             (new Column('name', Types::STRING))->setHeader('Имя'),
-        ], $users)
+        ], [['name' => 'Иван']])
+        ->withId('users_table') // Задаем ID для блока
     )
 ]);
 
-// 3. Экспортируем файл
 try {
     $client = new Client();
-    $client->exportToFile(
-        $_SERVER['DOCUMENT_ROOT'] . '/upload/report.xlsx',
-        $schema
-    );
+    $client->exportToFile('report.xlsx', $schema);
 } catch (\Exception $e) { /* ... */ }
 ```
 
@@ -93,12 +85,11 @@ use Chelbit\Exceltools\Enums\Types;
 // 1. Описываем, откуда и какие данные мы хотим прочитать
 $schema = Schema::create([
     Sheet::create('Пользователи')->addBlock(
-        // Определяем блок в ячейке A1 и колонки, которые нужно из него прочитать
         Block::create('A1', [
             (new Column('name', Types::STRING)),
             (new Column('email', Types::STRING)),
         ])
-        // Для импорта из блока, мы предполагаем, что он читается до первой пустой строки.
+        ->withId('main_users_block') // Указываем ID, чтобы легко найти данные в ответе
     )
 ]);
 
@@ -107,15 +98,10 @@ try {
     $client = new Client();
     $filePath = $_SERVER['DOCUMENT_ROOT'] . '/upload/users_to_import.xlsx';
 
-    // Метод parse теперь возвращает единый массив с результатом
     $result = $client->parse($filePath, $schema);
 
-    if (!empty($result['errors'])) {
-        // Обрабатываем ошибки уровня всего файла
-    }
-
-    // Получаем данные из конкретного блока
-    $userData = $result['data']['Пользователи']['block_A1'] ?? [];
+    // Получаем данные из конкретного блока по его ID
+    $userData = $result['data']['Пользователи']['main_users_block'] ?? [];
     foreach ($userData as $user) {
         print_r($user);
     }

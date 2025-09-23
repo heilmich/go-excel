@@ -5,6 +5,7 @@ use JsonSerializable;
 
 class Block implements JsonSerializable
 {
+    protected ?string $id = null;
     protected ?string $startCell = null;
     protected ?int $startRow = null;
     protected ?string $startCol = null;
@@ -24,6 +25,12 @@ class Block implements JsonSerializable
     public static function create(string $startCell, array $columns, array $data): self
     {
         return new static($startCell, $columns, $data); // Use `static` for late static binding
+    }
+
+    public function withId(string $id): self
+    {
+        $this->id = $id;
+        return $this;
     }
 
     public function setOrientation(string $orientation): self
@@ -49,6 +56,7 @@ class Block implements JsonSerializable
     public function jsonSerialize(): array
     {
         $payload = [
+            'id' => $this->id,
             'startCell' => $this->startCell,
             'startRow' => $this->startRow,
             'startCol' => $this->startCol,

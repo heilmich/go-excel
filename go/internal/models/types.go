@@ -44,6 +44,7 @@ type Column struct {
 // Block is a generic container for data at a specific location.
 // It uses the default columns defined on its parent Sheet.
 type Block struct {
+	Id          string                 `json:"id,omitempty"` // Optional identifier for the block
 	StartCell   string                 `json:"startCell,omitempty"`
 	StartRow    int                    `json:"startRow,omitempty"`
 	StartCol    string                 `json:"startCol,omitempty"`
@@ -54,6 +55,7 @@ type Block struct {
 
 // Table is a self-contained block that has its own column definitions.
 type Table struct {
+	Id          string                 `json:"id,omitempty"` // Optional identifier for the table
 	StartCell   string                 `json:"startCell,omitempty"`
 	StartRow    int                    `json:"startRow,omitempty"`
 	StartCol    string                 `json:"startCol,omitempty"`

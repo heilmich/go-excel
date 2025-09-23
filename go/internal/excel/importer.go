@@ -53,7 +53,10 @@ func (i *Importer) Process() (*models.ImportResult, error) {
 				result.Errors = append(result.Errors, fmt.Sprintf("error reading block at %s on sheet %s: %v", block.StartCell, sheetName, err))
 				continue
 			}
-			blockIdentifier := fmt.Sprintf("block_%s", block.StartCell)
+			blockIdentifier := block.Id
+			if blockIdentifier == "" {
+				blockIdentifier = fmt.Sprintf("block_%s", block.StartCell)
+			}
 			result.Data[sheetName][blockIdentifier] = blockData
 		}
 
@@ -64,7 +67,10 @@ func (i *Importer) Process() (*models.ImportResult, error) {
 				result.Errors = append(result.Errors, fmt.Sprintf("error reading table at %s on sheet %s: %v", table.StartCell, sheetName, err))
 				continue
 			}
-			tableIdentifier := fmt.Sprintf("table_%s", table.StartCell)
+			tableIdentifier := table.Id
+			if tableIdentifier == "" {
+				tableIdentifier = fmt.Sprintf("table_%s", table.StartCell)
+			}
 			result.Data[sheetName][tableIdentifier] = tableData
 		}
 	}
