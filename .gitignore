@@ -1,0 +1,15 @@
+# Go binaries
+excelms
+go/excelms
+
+# OS-specific
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Folders
+/vendor/
+/build/
+/dist/

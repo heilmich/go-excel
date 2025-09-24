@@ -1,0 +1,48 @@
+{
+  "sheets": [
+    {
+      "sheet": "Отчет по продажам",
+      "tables": [
+        {
+          "id": "main_sales_table",
+          "startCell": "A1",
+          "showHeaders": true,
+          "columns": [
+            {
+              "name": "product",
+              "header": "Продукт",
+              "type": "string",
+              "width": 40
+            },
+            {
+              "name": "quantity",
+              "header": "Количество",
+              "type": "int"
+            },
+            {
+              "name": "amount",
+              "header": "Сумма",
+              "type": "float",
+              "customFormat": "#,##0.00"
+            }
+          ],
+          "data": [
+            {
+              "product": "Ноутбук 'Молния-15'",
+              "quantity": 10,
+              "amount": 750000.00
+            },
+            {
+              "product": "Монитор 'Ясный Взгляд 27'",
+              "quantity": 25,
+              "amount": 562500.00
+            }
+          ]
+        }
+      ],
+      "options": {
+        "freeze": "A2"
+      }
+    }
+  ]
+}
