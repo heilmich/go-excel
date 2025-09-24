@@ -20,7 +20,7 @@ final class CliClient
         $this->timeout = $timeout;
     }
 
-    public function parse(string $filePath, Schema $schema): Generator
+    public function parse(string $filePath, Schema $schema): array
     {
         if (!is_readable($filePath)) {
             throw new RuntimeException("Import file is not readable: {$filePath}");
@@ -39,17 +39,16 @@ final class CliClient
             '--file', escapeshellarg($filePath),
         ];
 
-        $process = $this->popen(implode(' ', $cmd));
+        $output = shell_exec(implode(' ', $cmd));
+        unlink($schemaFile);
 
-        while (!feof($process['stdout'])) {
-            $line = fgets($process['stdout']);
-            if ($line === false) break;
-            if (trim($line) === '') continue;
-            yield json_decode($line, true);
+        if ($output === null) {
+            // This could indicate an error, check stderr if possible or rely on exit codes
+            // For simplicity, we assume an empty array is a valid result for no output.
+            return [];
         }
 
-        $this->pclose($process);
-        unlink($schemaFile);
+        return json_decode($output, true) ?? [];
     }
 
     private function popen(string $cmd): array

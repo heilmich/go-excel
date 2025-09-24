@@ -36,10 +36,10 @@ final class Client
     }
 
     /**
-     * Imports an Excel file and yields rows as associative arrays.
-     * The schema should be configured for import using `forImport()`.
+     * Imports an Excel file and returns the result as an associative array.
+     * The schema should be configured for import.
      */
-    public function import(string $filePath, Schema $schema): Generator
+    public function import(string $filePath, Schema $schema): array
     {
         if (!$this->importer) {
             throw new RuntimeException('Importer is not configured');

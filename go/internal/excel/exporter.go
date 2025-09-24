@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"chelbit/excelms/internal/models"
 	"github.com/xuri/excelize/v2"
@@ -58,7 +59,6 @@ func (e *Exporter) Process() ([]byte, error) {
 		}
 	}
 
-	// If we started with a new file and never explicitly requested "Sheet1", delete it.
 	if len(e.templateBytes) == 0 && e.file.SheetCount > 1 {
 		isSheet1Requested := false
 		for _, s := range e.request.Sheets {
@@ -117,7 +117,7 @@ func (e *Exporter) writeBlock(sheetName string, block models.Block, startCol, st
 	headerRow := startRow
 	dataStartRow := startRow
 	if block.ShowHeaders {
-		dataStartRow++ // Data starts one row below headers
+		dataStartRow++
 	}
 
 	if block.ShowHeaders {
@@ -130,14 +130,64 @@ func (e *Exporter) writeBlock(sheetName string, block models.Block, startCol, st
 	for rowIndex, dataRow := range block.Data {
 		for colIndex, colDef := range block.Columns {
 			value, _ := dataRow[colDef.Name]
-			cell, _ := excelize.CoordinatesToCellName(startCol+colIndex, dataStartRow+rowIndex)
-			if err := f.SetCellValue(sheetName, cell, value); err != nil { return err }
+
+			typedValue, err := convertToType(value, colDef.Type)
+			if err != nil {
+				// For export, if conversion fails, we can fall back to writing the original value as a string.
+				typedValue = fmt.Sprintf("%v", value)
+			}
+
+			var cell string
+			if orientation == models.Horizontal {
+				cell, _ = excelize.CoordinatesToCellName(startCol+rowIndex, dataStartRow+colIndex)
+			} else {
+				cell, _ = excelize.CoordinatesToCellName(startCol+colIndex, dataStartRow+rowIndex)
+			}
+
+			if err := f.SetCellValue(sheetName, cell, typedValue); err != nil { return err }
 			if styleID, ok := styleCache[colDef.CustomFormat]; ok {
 				if err := f.SetCellStyle(sheetName, cell, cell, styleID); err != nil { return err }
 			}
 		}
 	}
 	return nil
+}
+
+func convertToType(value interface{}, dataType models.DataType) (interface{}, error) {
+	if value == nil {
+		return nil, nil
+	}
+	strVal := fmt.Sprintf("%v", value)
+	switch dataType {
+	case models.TypeInt:
+		if f, err := strconv.ParseFloat(strVal, 64); err == nil {
+			return int(f), nil
+		}
+		return nil, fmt.Errorf("cannot convert '%v' to int", value)
+	case models.TypeFloat:
+		if f, err := strconv.ParseFloat(strVal, 64); err == nil {
+			return f, nil
+		}
+		return nil, fmt.Errorf("cannot convert '%v' to float", value)
+	case models.TypeBool:
+		if b, err := strconv.ParseBool(strVal); err == nil {
+			return b, nil
+		}
+		return nil, fmt.Errorf("cannot convert '%v' to bool", value)
+	case models.TypeDate, models.TypeDateTime:
+		if t, ok := value.(time.Time); ok {
+			return t, nil
+		}
+		layouts := []string{time.RFC3339, "2006-01-02T15:04:05", "2006-01-02"}
+		for _, layout := range layouts {
+			if t, err := time.Parse(layout, strVal); err == nil {
+				return t, nil
+			}
+		}
+		return value, nil // Fallback
+	default:
+		return strVal, nil
+	}
 }
 
 func (e *Exporter) createStyleCache(sheet models.Sheet) (map[string]int, error) {

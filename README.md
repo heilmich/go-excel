@@ -21,59 +21,28 @@
 
 ### Примеры использования
 
-#### Пример экспорта (с Блоками, Таблицами и Шаблоном)
+#### Пример экспорта (с Блоками и Таблицами)
 
 ```php
 use Chelbit\Exceltools\Client;
 use Chelbit\Exceltools\Data\Schema;
 use Chelbit\Exceltools\Data\Sheet;
-use Chelbit\Exceltools\Data\Block;
 use Chelbit\Exceltools\Data\Table;
 use Chelbit\Exceltools\Data\Column;
 use Chelbit\Exceltools\Enums\Types;
 
-// 1. Готовим данные
-$users = [
-    ['name' => 'Иван Петров', 'email' => 'ivan@example.com'],
-];
-$stats = [
-    ['month' => 'Январь', 'revenue' => 50000],
-];
-
-// 2. Описываем структуру через объекты
 $schema = Schema::create([
-    Sheet::create('Пользователи и Статистика')
-        ->addBlock(
-            // Table - это Блок, который по умолчанию выводит заголовки.
-            Table::create('A1', [
-                (new Column('name', Types::STRING))->setHeader('Имя'),
-                (new Column('email', Types::STRING))->setHeader('Email')->setWidth(30),
-            ], $users)->withId('users_table')
-        )
-        ->addBlock(
-            // Block - по умолчанию НЕ выводит заголовки.
-            Block::create('A10', [
-                (new Column('month', Types::STRING))->setHeader('Месяц'),
-                (new Column('revenue', Types::FLOAT))->setHeader('Выручка'),
-            ], $stats)->withId('stats_block')->withHeaders(true) // но их можно включить
-        )
+    Sheet::create('Пользователи')->addBlock(
+        Table::create('A1', [
+            (new Column('name', Types::STRING))->setHeader('Имя'),
+        ], [['name' => 'Иван']])->withId('users_table')
+    )
 ]);
 
-// 3. Экспортируем файл, используя существующий файл как шаблон
 try {
     $client = new Client();
-    // Указываем путь к файлу-шаблону. Стили и другие листы из него сохранятся.
-    $templatePath = $_SERVER['DOCUMENT_ROOT'] . '/upload/templates/report_template.xlsx';
-
-    $client->exportToFile(
-        $_SERVER['DOCUMENT_ROOT'] . '/upload/final_report.xlsx',
-        $schema,
-        $templatePath // <--- Передача шаблона
-    );
-    echo 'Экспорт успешно завершен!';
-} catch (\Exception $e) {
-    echo 'Ошибка: ' . $e->getMessage();
-}
+    $client->exportToFile('report.xlsx', $schema);
+} catch (\Exception $e) { /* ... */ }
 ```
 
 #### Пример импорта (по Блокам)
@@ -86,7 +55,7 @@ use Chelbit\Exceltools\Data\Block;
 use Chelbit\Exceltools\Data\Column;
 use Chelbit\Exceltools\Enums\Types;
 
-// Описываем, откуда и какие данные мы хотим прочитать
+// 1. Описываем, откуда и какие данные мы хотим прочитать
 $schema = Schema::create([
     Sheet::create('Пользователи')->addBlock(
         Block::create('A1', [
@@ -96,5 +65,26 @@ $schema = Schema::create([
     )
 ]);
 
-// ... (логика импорта)
+// 2. Импортируем и обрабатываем данные
+try {
+    $client = new Client();
+    $filePath = $_SERVER['DOCUMENT_ROOT'] . '/upload/users_to_import.xlsx';
+
+    // Метод import теперь возвращает единый массив с результатом
+    $result = $client->import($filePath, $schema);
+
+    if (!empty($result['errors'])) {
+        // Обрабатываем ошибки уровня всего файла
+        echo "Произошли ошибки: " . implode(', ', $result['errors']);
+    } else {
+        // Получаем данные из конкретного блока по его ID
+        $userData = $result['data']['Пользователи']['main_users_block'] ?? [];
+        foreach ($userData as $user) {
+            print_r($user);
+        }
+    }
+
+} catch (\Exception $e) {
+    echo 'Ошибка: ' . $e->getMessage();
+}
 ```

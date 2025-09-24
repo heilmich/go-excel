@@ -25,7 +25,7 @@ final class HttpClient
     }
 
     /** @param Schema|array|string $schema */
-    public function parse(string $filePath, $schema): \Generator
+    public function parse(string $filePath, $schema): array
     {
         $schemaObj = Schema::fromMixed($schema);
 
@@ -38,30 +38,18 @@ final class HttpClient
             CURLOPT_POST => true,
             CURLOPT_HTTPHEADER => $this->buildAuthHeaders(),
             CURLOPT_POSTFIELDS => $fields,
-            CURLOPT_RETURNTRANSFER => false,
+            CURLOPT_RETURNTRANSFER => true,
         ]);
 
-        $tmp = fopen('php://temp', 'w+');
-        curl_setopt($ch, CURLOPT_FILE, $tmp);
-        curl_exec($ch);
+        $response = curl_exec($ch);
         $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 
         if ($code !== 200) {
-            fclose($tmp);
-            throw new \RuntimeException('Импорт: ошибка сервиса (' . $code . ')');
+            throw new \RuntimeException('Импорт: ошибка сервиса (' . $code . '): ' . $response);
         }
 
-        rewind($tmp);
-        while (!feof($tmp)) {
-            $line = fgets($tmp);
-            if ($line === false) { break; }
-            $line = trim($line);
-            if ($line === '') { continue; }
-            $row = json_decode($line, true);
-            if (is_array($row)) { yield $row; }
-        }
-        fclose($tmp);
+        return json_decode($response, true) ?? [];
     }
 
     /** @param Schema|array|string $schema */
