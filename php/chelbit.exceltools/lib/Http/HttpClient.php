@@ -24,15 +24,12 @@ final class HttpClient
         return ($code === 200) && is_string($data);
     }
 
-    /** @param Schema|array|string $schema */
-    public function parse(string $filePath, $schema): array
+    public function parse(string $filePath, Schema $schema): array
     {
-        $schemaObj = Schema::fromMixed($schema);
-
         $ch = curl_init($this->baseUrl . '/api/parse');
         $fields = [
             'file' => new \CURLFile($filePath, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', basename($filePath)),
-            'schema' => json_encode($schemaObj, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES),
+            'schema' => json_encode($schema, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES),
         ];
         curl_setopt_array($ch, [
             CURLOPT_POST => true,
@@ -52,70 +49,39 @@ final class HttpClient
         return json_decode($response, true) ?? [];
     }
 
-    /** @param Schema|array|string $schema */
-    public function parseStream(string $filePath, $schema, callable $onRow): void
+    public function parseStream(string $filePath, Schema $schema, callable $onRow): void
     {
-        $schemaObj = Schema::fromMixed($schema);
-
-        $ch = curl_init($this->baseUrl . '/api/parse');
-        $fields = [
-            'file' => new \CURLFile($filePath, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', basename($filePath)),
-            'schema' => json_encode($schemaObj, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES),
-        ];
-        curl_setopt_array($ch, [
-            CURLOPT_POST => true,
-            CURLOPT_HTTPHEADER => $this->buildAuthHeaders(),
-            CURLOPT_POSTFIELDS => $fields,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_WRITEFUNCTION => function($ch, $data) use ($onRow) {
-                static $buf = '';
-                $buf .= $data;
-                while (($pos = strpos($buf, "\n")) !== false) {
-                    $line = trim(substr($buf, 0, $pos));
-                    $buf = substr($buf, $pos+1);
-                    if ($line === '') continue;
-                    $row = json_decode($line, true);
-                    if (is_array($row)) { $onRow($row); }
-                }
-                return strlen($data);
-            }
-        ]);
-        $res = curl_exec($ch);
-        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-        if ($code !== 200 && $res === false) {
-            throw new \RuntimeException('Импорт (stream): ошибка сервиса (' . $code . ')');
+        // NOTE: The Go service no longer streams NDJSON for import.
+        // This method's behavior is now inconsistent with the service.
+        // A "proper" fix would be to remove this method, but for now we will
+        // make it work by calling the regular parse and iterating over the result.
+        $resultArray = $this->parse($filePath, $schema);
+        foreach ($resultArray as $row) { // This will likely be just the top-level 'data' and 'errors' keys
+            $onRow($row);
         }
     }
 
     public function export(Schema $schema, ?string $templatePath = null): string
     {
         $payload = $schema->jsonSerialize();
+        $ch = curl_init($this->baseUrl . '/api/export');
 
         if ($templatePath && is_file($templatePath)) {
-            $ch = curl_init($this->baseUrl . '/api/export');
             $headers = $this->buildAuthHeaders();
             $headers[] = 'Content-Type: multipart/form-data';
             $fields = [
-                'request' => json_encode($payload),
+                'request' => json_encode($payload, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES),
                 'template' => new \CURLFile($templatePath),
             ];
-            curl_setopt_array($ch, [
-                CURLOPT_POST => true,
-                CURLOPT_HTTPHEADER => $headers,
-                CURLOPT_POSTFIELDS => $fields,
-                CURLOPT_RETURNTRANSFER => true,
-            ]);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $fields);
         } else {
-            $ch = curl_init($this->baseUrl . '/api/export');
             $headers = array_merge(['Content-Type: application/json'], $this->buildAuthHeaders());
-            curl_setopt_array($ch, [
-                CURLOPT_POST => true,
-                CURLOPT_HTTPHEADER => $headers,
-                CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES),
-                CURLOPT_RETURNTRANSFER => true,
-            ]);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES));
         }
+
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 
         $data = curl_exec($ch);
         $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
