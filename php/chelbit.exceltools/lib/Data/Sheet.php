@@ -11,12 +11,10 @@ final class Sheet implements JsonSerializable
     /** @var Block[] */
     private array $blocks = [];
 
-    /** @var Table[] */
-    private array $tables = [];
-
-    // Other sheet-level properties from Go struct can be added here if needed
     private array $formulas = [];
     private array $options = [];
+    private ?int $headerRow = null; // For import
+    private ?int $startRow = null;  // For import
 
     public function __construct(?string $name = null, ?int $index = null)
     {
@@ -34,27 +32,9 @@ final class Sheet implements JsonSerializable
         return $this->name;
     }
 
-    public function withBlocks(array $blocks): self
-    {
-        $this->blocks = $blocks;
-        return $this;
-    }
-
     public function addBlock(Block $block): self
     {
         $this->blocks[] = $block;
-        return $this;
-    }
-
-    public function withTables(array $tables): self
-    {
-        $this->tables = $tables;
-        return $this;
-    }
-
-    public function addTable(Table $table): self
-    {
-        $this->tables[] = $table;
         return $this;
     }
 
@@ -70,8 +50,9 @@ final class Sheet implements JsonSerializable
         $payload = [
             'sheet' => $this->name,
             'sheetIndex' => $this->index,
+            'headerRow' => $this->headerRow,
+            'startRow' => $this->startRow,
             'blocks' => $this->blocks,
-            'tables' => $this->tables,
             'formulas' => $this->formulas,
             'options' => $this->options,
         ];

@@ -1,9 +1,6 @@
 package models
 
-// This file defines the shared structures for API requests and internal processing.
-
 // --- Enums ---
-
 type Orientation string
 const (
 	Vertical   Orientation = "vertical"
@@ -25,7 +22,7 @@ const (
 type Column struct {
 	Name         string   `json:"name"`
 	Header       string   `json:"header,omitempty"`
-	Column       string   `json:"column,omitempty"`
+	Column       string   `json:"column,omitempty"` // For import mapping
 	Type         DataType `json:"type"`
 	CustomFormat string   `json:"customFormat,omitempty"`
 	Width        float64  `json:"width,omitempty"`
@@ -41,28 +38,17 @@ type Column struct {
 	Timezone     string   `json:"timezone,omitempty"`
 }
 
-// Block is a generic container for data at a specific location.
-// It uses the default columns defined on its parent Sheet.
+// Block is the universal container for a region of data in a sheet.
+// It can optionally contain its own column definitions.
 type Block struct {
-	Id          string                 `json:"id,omitempty"` // Optional identifier for the block
+	Id          string                 `json:"id,omitempty"`
 	StartCell   string                 `json:"startCell,omitempty"`
 	StartRow    int                    `json:"startRow,omitempty"`
 	StartCol    string                 `json:"startCol,omitempty"`
 	Orientation Orientation            `json:"orientation,omitempty"`
-	ShowHeaders bool                   `json:"showHeaders"` // Defaults to false for blocks
-	Data        []map[string]interface{} `json:"data"`
-}
-
-// Table is a self-contained block that has its own column definitions.
-type Table struct {
-	Id          string                 `json:"id,omitempty"` // Optional identifier for the table
-	StartCell   string                 `json:"startCell,omitempty"`
-	StartRow    int                    `json:"startRow,omitempty"`
-	StartCol    string                 `json:"startCol,omitempty"`
-	Orientation Orientation            `json:"orientation,omitempty"`
-	ShowHeaders bool                   `json:"showHeaders"` // Defaults to true for tables
-	Data        []map[string]interface{} `json:"data"`
-	Columns     []Column               `json:"columns"`
+	ShowHeaders bool                   `json:"showHeaders"`
+	Data        []map[string]interface{} `json:"data,omitempty"` // Optional for import schemas
+	Columns     []Column               `json:"columns,omitempty"` // Optional, if not present, import fails for this block
 }
 
 type Formula struct {
@@ -78,15 +64,13 @@ type Options struct {
 }
 
 type Sheet struct {
-	Name           string    `json:"sheet,omitempty"`
-	Index          int       `json:"sheetIndex,omitempty"`
-	HeaderRow      int       `json:"headerRow,omitempty"` // For import
-	StartRow       int       `json:"startRow,omitempty"`  // For import
-	DefaultColumns []Column  `json:"columns,omitempty"` // For Blocks
-	Blocks         []Block   `json:"blocks,omitempty"`
-	Tables         []Table   `json:"tables,omitempty"`
-	Formulas       []Formula `json:"formulas,omitempty"`
-	Options        Options   `json:"options,omitempty"`
+	Name      string    `json:"sheet,omitempty"`
+	Index     int       `json:"sheetIndex,omitempty"`
+	HeaderRow int       `json:"headerRow,omitempty"` // Legacy/Default for import
+	StartRow  int       `json:"startRow,omitempty"`  // Legacy/Default for import
+	Blocks    []Block   `json:"blocks,omitempty"`
+	Formulas  []Formula `json:"formulas,omitempty"`
+	Options   Options   `json:"options,omitempty"`
 }
 
 // --- API Request/Response Structures ---
@@ -97,7 +81,7 @@ type Request struct {
 	TemplateBase64 string  `json:"templateBase64,omitempty"`
 }
 
-// ImportResult is the new structure for the entire import response.
+// ImportResult is the structure for the import response.
 type ImportResult struct {
 	Data   map[string]map[string][]map[string]interface{} `json:"data"` // SheetName -> BlockIdentifier -> []RowData
 	Errors []string                                     `json:"errors,omitempty"`

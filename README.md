@@ -13,32 +13,6 @@
 
 ... (документация по Go опущена для краткости) ...
 
-### API: `POST /api/parse` (Импорт)
-
-Парсит файл Excel в соответствии со схемой и возвращает извлеченные данные в виде единого JSON-объекта.
-
--   **Content-Type**: `multipart/form-data`.
--   **Тело запроса**:
-    -   `schema`: Поле формы, содержащее JSON-схему для импорта. Схема должна определять Листы и Блоки/Таблицы, из которых нужно извлечь данные. В каждом блоке можно указать опциональный строковый `id`.
-    -   `file`: Файл `.xlsx` для парсинга.
--   **Ответ `200 OK`**: Единый JSON-объект, сгруппированный по листам и идентификаторам блоков.
-
-**Пример ответа импорта:**
-
-```json
-{
-  "data": {
-    "ИменаСотрудников": {
-      "main_users_block": [
-        { "name": "Иван", "surname": "Петров" },
-        { "name": "Анна", "surname": "Сидорова" }
-      ]
-    }
-  },
-  "errors": []
-}
-```
-
 ---
 
 ## 2. PHP Модуль для Bitrix (`chelbit.exceltools`)
@@ -47,29 +21,59 @@
 
 ### Примеры использования
 
-#### Пример экспорта (с Блоками и Таблицами)
+#### Пример экспорта (с Блоками, Таблицами и Шаблоном)
 
 ```php
 use Chelbit\Exceltools\Client;
 use Chelbit\Exceltools\Data\Schema;
 use Chelbit\Exceltools\Data\Sheet;
+use Chelbit\Exceltools\Data\Block;
 use Chelbit\Exceltools\Data\Table;
 use Chelbit\Exceltools\Data\Column;
 use Chelbit\Exceltools\Enums\Types;
 
+// 1. Готовим данные
+$users = [
+    ['name' => 'Иван Петров', 'email' => 'ivan@example.com'],
+];
+$stats = [
+    ['month' => 'Январь', 'revenue' => 50000],
+];
+
+// 2. Описываем структуру через объекты
 $schema = Schema::create([
-    Sheet::create('Пользователи')->addBlock(
-        Table::create('A1', [
-            (new Column('name', Types::STRING))->setHeader('Имя'),
-        ], [['name' => 'Иван']])
-        ->withId('users_table') // Задаем ID для блока
-    )
+    Sheet::create('Пользователи и Статистика')
+        ->addBlock(
+            // Table - это Блок, который по умолчанию выводит заголовки.
+            Table::create('A1', [
+                (new Column('name', Types::STRING))->setHeader('Имя'),
+                (new Column('email', Types::STRING))->setHeader('Email')->setWidth(30),
+            ], $users)->withId('users_table')
+        )
+        ->addBlock(
+            // Block - по умолчанию НЕ выводит заголовки.
+            Block::create('A10', [
+                (new Column('month', Types::STRING))->setHeader('Месяц'),
+                (new Column('revenue', Types::FLOAT))->setHeader('Выручка'),
+            ], $stats)->withId('stats_block')->withHeaders(true) // но их можно включить
+        )
 ]);
 
+// 3. Экспортируем файл, используя существующий файл как шаблон
 try {
     $client = new Client();
-    $client->exportToFile('report.xlsx', $schema);
-} catch (\Exception $e) { /* ... */ }
+    // Указываем путь к файлу-шаблону. Стили и другие листы из него сохранятся.
+    $templatePath = $_SERVER['DOCUMENT_ROOT'] . '/upload/templates/report_template.xlsx';
+
+    $client->exportToFile(
+        $_SERVER['DOCUMENT_ROOT'] . '/upload/final_report.xlsx',
+        $schema,
+        $templatePath // <--- Передача шаблона
+    );
+    echo 'Экспорт успешно завершен!';
+} catch (\Exception $e) {
+    echo 'Ошибка: ' . $e->getMessage();
+}
 ```
 
 #### Пример импорта (по Блокам)
@@ -82,31 +86,15 @@ use Chelbit\Exceltools\Data\Block;
 use Chelbit\Exceltools\Data\Column;
 use Chelbit\Exceltools\Enums\Types;
 
-// 1. Описываем, откуда и какие данные мы хотим прочитать
+// Описываем, откуда и какие данные мы хотим прочитать
 $schema = Schema::create([
     Sheet::create('Пользователи')->addBlock(
         Block::create('A1', [
             (new Column('name', Types::STRING)),
             (new Column('email', Types::STRING)),
-        ])
-        ->withId('main_users_block') // Указываем ID, чтобы легко найти данные в ответе
+        ])->withId('main_users_block')
     )
 ]);
 
-// 2. Импортируем и обрабатываем данные
-try {
-    $client = new Client();
-    $filePath = $_SERVER['DOCUMENT_ROOT'] . '/upload/users_to_import.xlsx';
-
-    $result = $client->parse($filePath, $schema);
-
-    // Получаем данные из конкретного блока по его ID
-    $userData = $result['data']['Пользователи']['main_users_block'] ?? [];
-    foreach ($userData as $user) {
-        print_r($user);
-    }
-
-} catch (\Exception $e) {
-    echo 'Ошибка: ' . $e->getMessage();
-}
+// ... (логика импорта)
 ```
