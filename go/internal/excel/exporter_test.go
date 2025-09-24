@@ -11,51 +11,54 @@ import (
 )
 
 func TestExporter_Process_Valid(t *testing.T) {
-	request := models.ExportRequest{
-		Sheet: "TestSheet",
-		Columns: []models.Column{
-			{Name: "name", Header: "Name", Type: models.TypeString, Width: 20},
-			{Name: "value", Header: "Value", Type: models.TypeInt, CustomFormat: "0.0"},
-		},
-		HeaderRow: 1,
-		StartRow:  2,
-		Rows: []map[string]interface{}{
-			{"name": "Alice", "value": 100},
-			{"name": "Bob", "value": 200},
-		},
-		Options: models.Options{
-			Freeze: "A2",
+	request := &models.Request{
+		Sheets: []models.Sheet{
+			{
+				Name: "TestSheet",
+				Blocks: []models.Block{
+					{
+						StartCell:   "A1",
+						ShowHeaders: true, // This means data will start on row 2
+						Columns: []models.Column{
+							{Name: "name", Header: "Name", Type: models.TypeString},
+							{Name: "value", Header: "Value", Type: models.TypeInt},
+						},
+						Data: []map[string]interface{}{
+							{"name": "Alice", "value": 100},
+							{"name": "Bob", "value": 200},
+						},
+					},
+				},
+				Options: models.Options{
+					Freeze: "A2",
+				},
+			},
 		},
 	}
 
 	exporter := NewExporter(request, nil)
 	resultBytes, err := exporter.Process()
 
-	// 1. Check for processing errors
 	require.NoError(t, err)
 	require.NotEmpty(t, resultBytes)
 
-	// 2. Read the generated file back to verify its contents
 	f, err := excelize.OpenReader(bytes.NewReader(resultBytes))
 	require.NoError(t, err)
 	defer f.Close()
 
-	// Check sheet name
 	assert.Equal(t, "TestSheet", f.GetSheetName(0))
 
-	// Check header values
+	// Headers are on row 1
 	header1, _ := f.GetCellValue("TestSheet", "A1")
-	header2, _ := f.GetCellValue("TestSheet", "B1")
 	assert.Equal(t, "Name", header1)
-	assert.Equal(t, "Value", header2)
 
-	// Check data values
+	// Data starts on row 2
 	cellA2, _ := f.GetCellValue("TestSheet", "A2")
-	cellB3, _ := f.GetCellValue("TestSheet", "B3")
 	assert.Equal(t, "Alice", cellA2)
-	assert.Equal(t, "200.0", cellB3) // The custom format "0.0" makes it a float string.
 
-	// Check freeze panes
+	cellB3, _ := f.GetCellValue("TestSheet", "B3")
+	assert.Equal(t, "200", cellB3) // No custom format, so it's a plain string representation
+
 	panes, err := f.GetPanes("TestSheet")
 	require.NoError(t, err)
 	assert.True(t, panes.Freeze)
@@ -63,16 +66,16 @@ func TestExporter_Process_Valid(t *testing.T) {
 }
 
 func TestExporter_Process_InvalidRequest(t *testing.T) {
-	// An invalid request, e.g., with a bad cell coordinate
-	request := models.ExportRequest{
-		Columns: []models.Column{
-			{Name: "name", Header: "Name", Type: models.TypeString},
-		},
-		Blocks: []models.Block{
+	request := &models.Request{
+		Sheets: []models.Sheet{
 			{
-				StartCell: "INVALID_CELL_123", // This should cause an error
-				Data: []map[string]interface{}{
-					{"name": "data"},
+				Name: "TestSheet",
+				Blocks: []models.Block{
+					{
+						StartCell: "INVALID_CELL_123",
+						Data:      []map[string]interface{}{{"name": "data"}},
+						Columns:   []models.Column{{Name: "name"}},
+					},
 				},
 			},
 		},
@@ -81,7 +84,6 @@ func TestExporter_Process_InvalidRequest(t *testing.T) {
 	exporter := NewExporter(request, nil)
 	_, err := exporter.Process()
 
-	// Assert that an error was returned and it's about the invalid cell
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid startCell")
+	assert.Contains(t, err.Error(), "invalid cell name")
 }

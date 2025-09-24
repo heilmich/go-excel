@@ -66,7 +66,6 @@ func (i *Importer) readBlockData(sheetName string, block models.Block) ([]map[st
 
 	var allRowsData []map[string]interface{}
 
-	// Convention: Read rows until we hit a completely empty row.
 	for rowOffset := 0; ; rowOffset++ {
 		isRowEmpty := true
 		rowData := make(map[string]interface{})

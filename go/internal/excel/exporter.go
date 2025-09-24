@@ -33,8 +33,14 @@ func (e *Exporter) Process() ([]byte, error) {
 	if err != nil { return nil, err }
 	defer e.file.Close()
 
+	initialSheetName := "Sheet1"
+	if len(e.file.GetSheetList()) > 0 {
+		initialSheetName = e.file.GetSheetName(0)
+	}
+
 	for i, sheetData := range e.request.Sheets {
-		sheetName, err := e.getTargetSheet(i, sheetData)
+		isFirstSheetInNewFile := (i == 0 && len(e.templateBytes) == 0)
+		sheetName, err := e.getTargetSheet(isFirstSheetInNewFile, initialSheetName, sheetData)
 		if err != nil { return nil, err }
 
 		styleCache, err := e.createStyleCache(sheetData)
@@ -52,29 +58,36 @@ func (e *Exporter) Process() ([]byte, error) {
 		}
 	}
 
-	if len(e.request.Sheets) > 0 {
-		if _, err := e.file.GetSheetIndex("Sheet1"); err == nil {
-			isDefaultSheetUsed := false
-			for _, s := range e.request.Sheets {
-				if s.Name == "Sheet1" {
-					isDefaultSheetUsed = true
-					break
-				}
-			}
-			if !isDefaultSheetUsed {
-				e.file.DeleteSheet("Sheet1")
+	// If we started with a new file and never explicitly requested "Sheet1", delete it.
+	if len(e.templateBytes) == 0 && e.file.SheetCount > 1 {
+		isSheet1Requested := false
+		for _, s := range e.request.Sheets {
+			if s.Name == "Sheet1" {
+				isSheet1Requested = true
+				break
 			}
 		}
+		if !isSheet1Requested {
+			e.file.DeleteSheet("Sheet1")
+		}
 	}
+
 
 	buf, err := e.file.WriteToBuffer()
 	if err != nil { return nil, err }
 	return buf.Bytes(), nil
 }
 
-func (e *Exporter) getTargetSheet(sheetIndex int, sheet models.Sheet) (string, error) {
+func (e *Exporter) getTargetSheet(isFirstSheet bool, initialSheetName string, sheet models.Sheet) (string, error) {
 	f := e.file
 	name := sheet.Name
+
+	if isFirstSheet && name != "" && name != initialSheetName {
+		if err := f.SetSheetName(initialSheetName, name); err != nil {
+			return "", fmt.Errorf("failed to rename default sheet: %w", err)
+		}
+		return name, nil
+	}
 
 	if name != "" {
 		if idx, err := f.GetSheetIndex(name); err == nil {
@@ -85,10 +98,6 @@ func (e *Exporter) getTargetSheet(sheetIndex int, sheet models.Sheet) (string, e
 		if err != nil { return "", err }
 		f.SetActiveSheet(idx)
 		return name, nil
-	}
-
-	if sheetIndex == 0 {
-		return f.GetSheetName(0), nil
 	}
 
 	if sheet.Index > 0 {
@@ -102,20 +111,18 @@ func (e *Exporter) getTargetSheet(sheetIndex int, sheet models.Sheet) (string, e
 
 func (e *Exporter) writeBlock(sheetName string, block models.Block, startCol, startRow int, styleCache map[string]int) error {
 	f := e.file
-	headerRow := startRow - 1
-	if headerRow < 1 { headerRow = 1 }
-	dataStartRow := startRow
 	orientation := block.Orientation
 	if orientation == "" { orientation = models.Vertical }
 
+	headerRow := startRow
+	dataStartRow := startRow
+	if block.ShowHeaders {
+		dataStartRow++ // Data starts one row below headers
+	}
+
 	if block.ShowHeaders {
 		for i, colDef := range block.Columns {
-			var cell string
-			if orientation == models.Horizontal {
-				cell, _ = excelize.CoordinatesToCellName(startCol, headerRow+i)
-			} else {
-				cell, _ = excelize.CoordinatesToCellName(startCol+i, headerRow)
-			}
+			cell, _ := excelize.CoordinatesToCellName(startCol+i, headerRow)
 			if err := f.SetCellValue(sheetName, cell, colDef.Header); err != nil { return err }
 		}
 	}
@@ -123,12 +130,7 @@ func (e *Exporter) writeBlock(sheetName string, block models.Block, startCol, st
 	for rowIndex, dataRow := range block.Data {
 		for colIndex, colDef := range block.Columns {
 			value, _ := dataRow[colDef.Name]
-			var cell string
-			if orientation == models.Horizontal {
-				cell, _ = excelize.CoordinatesToCellName(startCol+rowIndex, dataStartRow+colIndex)
-			} else {
-				cell, _ = excelize.CoordinatesToCellName(startCol+colIndex, dataStartRow+rowIndex)
-			}
+			cell, _ := excelize.CoordinatesToCellName(startCol+colIndex, dataStartRow+rowIndex)
 			if err := f.SetCellValue(sheetName, cell, value); err != nil { return err }
 			if styleID, ok := styleCache[colDef.CustomFormat]; ok {
 				if err := f.SetCellStyle(sheetName, cell, cell, styleID); err != nil { return err }
